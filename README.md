@@ -1,4 +1,4 @@
-# s3air-vsmetalsonic
+# Vs Metal Sonic in Sonic 3 A.I.R
 Adds Metal Sonic as a boss fight to Sonic 3 Angel Island Revisited.
 
 There is no explanation as to why Metal Sonic is here, but that will come when my level mod releases (eventually).
