@@ -1,0 +1,787 @@
+global bool option.MetalBossTheme
+global u8 option.hitcount
+
+global u8 MetalSonic.state
+global u16 MetalSonic.state_timer
+global bool MetalSonic.phase2
+global bool MetalSonic.dead
+global bool MetalSonic.flip
+global bool MetalSonic.prepare
+global u8 MetalSonic.dead_timer
+global u8 MetalSonic.cycle
+global u32 MetalSonic.scale
+global u32 realLock.left
+global u32 realLock.right
+global u32 realLock.y
+global bool MetalSonic.sparking
+global u8 MetalSonic.movementDir
+global u8 MetalSonic.laserShotTimer
+
+/*
+MetalSonic.state
+0 - Intro
+1 - Idle
+2 - Jet attack
+3 - Going down into idle (like 0, but it draws the bossbar)
+4 - Laser shots above player
+5 - BG spike bomb attack
+*/
+
+global u32 MetalSonic.screenboundLeft
+global u32 MetalSonic.screenboundRight
+global u32 MetalSonic.screenboundBottom
+
+function void DrawBossHealthBar(u8 boss.id, u8 bar.health, u8 bar.max)
+{
+	base.DrawBossHealthBar(boss.id, bar.health, bar.max)
+}
+
+function s64 lerp(s64 val1, s64 val2, s64 div) 
+{
+    return val1 + ((val2-val1)/div)
+}
+
+function void setRealScreenBounds()
+{
+	realLock.left = move_area.left
+	realLock.right = move_area.right
+	realLock.y = move_area.bottom.current
+}
+
+function void restoreScreenBounds()
+{
+	MetalSonic.screenboundLeft = realLock.left
+	MetalSonic.screenboundRight = realLock.right
+	MetalSonic.screenboundBottom = realLock.y
+}
+
+function void updateScreenBounds()
+{
+	//System.writeDisplayLine("Updating Screen Bounds")
+	if (move_area.left == MetalSonic.screenboundLeft && move_area.right == MetalSonic.screenboundRight && move_area.bottom.current == MetalSonic.screenboundBottom)
+		player1.camera_lock = 1
+	move_area.left = lerp(move_area.left, MetalSonic.screenboundLeft, 30)
+	move_area.right = lerp(move_area.right, MetalSonic.screenboundRight, 30)
+	move_area.bottom.target = lerp(move_area.bottom.target, MetalSonic.screenboundBottom, 30)
+	if (camera.position.x.u16 >= MetalSonic.screenboundLeft && camera.position.x.u16 + getScreenWidth() <= MetalSonic.screenboundRight && camera.position.y.u16 - 224 < MetalSonic.screenboundBottom)
+		player1.camera_lock = 1
+	else
+		player1.camera_lock = 0
+}
+
+function void MoveScreenBounds(u32 left, u32 right)
+{
+	//System.writeDisplayLine(stringformat("Screen Bounds moved to left: 0x%04x, right: 0x%04x", left, right))
+	MetalSonic.screenboundLeft = left
+	MetalSonic.screenboundRight = right
+}
+
+function void MoveScreenBounds(u32 left, u32 right, u32 bottom)
+{
+	//System.writeDisplayLine(stringformat("Screen Bounds moved to left: 0x%04x, right: 0x%04x, bottom: 0x%04x", left, right, bottom))
+	MetalSonic.screenboundLeft = left
+	MetalSonic.screenboundRight = right
+	MetalSonic.screenboundBottom = bottom
+}
+
+//# address-hook(0x07f0d2) end(0x07f0d8)
+function void fn07f0d2()
+{
+	if (u8[0xffffe654] != 4)
+	{
+		MetalSonic.Init()
+		return
+	}
+	base.fn07f0d2()
+}
+
+//# address-hook(0x07f06c) end(0x07f0ba)
+function void fn07f06c()
+{
+	A1 = 0x07f0be
+	if (InitBoss(0x07f076))
+		return
+
+	objA0.update_address = 0x07f0ce
+	objA0.countdown_callback = 0x07f0d2
+
+	A1 = 0x07f0c6
+	objA0.value26 = MUSIC_MAINBOSS
+	StartBossFight()
+	u8[0xfffffab8] = 0
+
+	requestLoadingPatterns(0x76)		// Robotnik running and standing sprites
+	Kosinski.addToDMAQueue(0x181002, 0x7140)		// Boss sprites
+	loadPaletteLine1(0x07fd08)
+
+	// "spawnChildObjects(0x07fc8c)" replaced by:
+	//spawnChildObject(0x07f71c, 0x00, 0, 0)
+	spawnChildObject(0x07f782, 0x02, 0, 0)
+}
+
+// Robotnik standing there and watching
+
+//# address-hook(0x07f71c) end(0x07f746)
+function void fn07f71c()
+{
+	setupObjectAttributesFull(0x07fc74)
+
+	objA0.update_address = 0x070068
+	objA0.countdown_callback = 0x07f74c
+	u32[A0 + 0x30] = 0x07fce2
+	objA0.position.x.u16 = 0x3610
+	objA0.position.y.u16 = 0x0324
+}
+
+//# address-hook(0x07f79c) end(0x07f7c8)
+function void fn07f79c()
+{
+	A1 = 0xffff0000 + u16[A0 + 0x46]
+	if (u8[A1 + 0x38] & 0x10)
+	{
+		objA0.animation.sprite = 0x15
+
+		// "spawnSimpleChildObjects(0x083fee)" replaced by:
+		spawnSimpleChildObjects(0x083d84, 1)		// Boss explosion generator
+		if (_equal())
+		{
+			u8[A1 + 0x2c] = 0x06
+		}
+	}
+}
+
+function u64 Standalone.getModdedSoundKey(u64 soundKey, u8 sfxId, u8 soundRegType)
+{
+	if (sfxId == MUSIC_MAINBOSS && global.zone_act == 0x0b01)
+	{
+		return "metalsonic_boss"
+	}
+	return base.Standalone.getModdedSoundKey(soundKey, sfxId, soundRegType)
+}
+
+function void MetalSonic.Init()
+{
+	if(allocDynamicObjectStd())
+	{
+		MoveScreenBounds(level.bossarea.left, level.bossarea.right - 120, level.bossarea.bottom - 20)
+		if option.hitcount == 0
+			boss.remaining_hits = 8
+		else if option.hitcount == 1
+			boss.remaining_hits = 12
+		else if option.hitcount == 2
+			boss.remaining_hits = 16
+		playMusic(level.default_music.u8)
+		objA0.update_address = 0x320000
+		objA0.sprite_attributes = (sprite_attribute.PRIORITY | 0x06bc)
+		objA0.render_flags = render_flag.WORLD| render_flag.VISIBLE
+		objA0.sprite_priority = 0x100
+            
+        objA0.box_size.x = 27
+        objA0.box_size.y = 47
+
+        objA0.collision_attributes = collision.size.12x20
+		objA0.hitbox_extends.x = 27
+		objA0.hitbox_extends.y = 47
+		
+		objA0.position.x.u16 = 0x3500
+		objA0.position.y.u16 = 0x0279
+
+		MetalSonic.cycle = 0
+		MetalSonic.state = 0
+		MetalSonic.state_timer = 0
+		MetalSonic.phase2 = false
+		MetalSonic.dead_timer = 0
+		MetalSonic.dead = false
+		MetalSonic.flip = false
+		MetalSonic.prepare = 0
+		MetalSonic.scale = 0x0010000
+	}
+}
+
+function void MetalSonic.SpawnLaserBlast()
+{
+	if (allocDynamicObjectStd())
+	{
+		MetalSonic.laserShotTimer = 6
+		playSound(0x54)
+		objA1.update_address = 0x322100
+		objA1.position.x.u16 = objA0.position.x.u16
+		objA1.position.y.u16 = objA0.position.y.u16
+	}
+}
+
+//# address-hook(0x323000)
+function void MetalSonic.SpikeBall.Update()
+{
+	if (objA0.position.y.u16 >= 0x033c)
+	{
+		if (allocDynamicObjectStd())
+		{
+			spawnChildObject(0x323100, 0x00, 0, 0)
+			playSound(0xb4)
+			objA1.render_flags |= render_flag.WORLD
+		}
+		UnloadObject()
+	}
+	if !Game.getSetting(SETTING_SMOOTH_ROTATION)
+	{
+		++objA0.value32
+		if (objA0.value32 > 3)
+		{
+			objA0.value26 += 0x10
+			objA0.value32 = 0
+		}
+	}
+	else
+	{
+		objA0.value26 += 0x05
+	}
+	MoveWithGravity20()
+
+	objA0.collision_attributes = collision.size.16x16|collision.flag.THREAT
+	Enemy.DrawDynamicObject()
+}
+
+//# address-hook(0x323100)
+function void MetalSonic.ProjectileExplosion.Update()
+{
+	DrawObject()
+	objA0.animation.sprite++
+	objA0.state++
+	if objA0.state == 12
+		UnloadObject()
+}
+
+//# address-hook(0x323600)
+function void MetalSonic.SpikeBall.Spawn()
+{
+	A1 = 0xffffb000
+	objA0.position.x.u16 = objA1.position.x.u16
+
+	objA0.render_flags |= render_flag.WORLD
+	objA0.velocity.y = 6
+	objA0.update_address = 0x323000
+}
+
+function void MetalSonic.SpikeAttack()
+{
+	playSound(0x98)
+	if(allocDynamicObjectStd())
+	{
+		objA1.update_address = 0x323600
+		objA1.position.y.u16 = 0x0278
+	}
+}
+
+//# address-hook(0x322000)
+function void MetalSonic.LaserBlast.Update()
+{
+	if (objA0.collision_attributes & collision.flag.THREAT)
+	{
+		Enemy.DrawDynamicObject()
+	}
+	else
+	{
+		DrawObject()
+	}
+	UpdateMovementStraightSimple()
+	++objA0.state
+	if (!(objA0.render_flags & render_flag.VISIBLE))
+	{
+		UnloadObject()
+	}
+}
+
+//# address-hook(0x322100)
+function void MetalSonic.HomingLaserBlast.Spawn()
+{
+	objA0.sprite_attributes = (sprite_attribute.PRIORITY | 0x06bc)
+	objA0.render_flags = render_flag.WORLD| render_flag.VISIBLE
+	objA0.sprite_priority = 0x100
+		
+	objA0.box_size.x = 16
+	objA0.box_size.y = 16
+
+	objA0.collision_attributes = collision.size.16x16
+	objA0.hitbox_extends.x = 16
+	objA0.hitbox_extends.y = 16
+	objA0.collision_attributes |= collision.flag.THREAT
+
+	objA0.velocity.y = 0x400
+	objA0.update_address = 0x322000
+}
+
+//# address-hook(0x320000)
+function void MetalSonic.Update()
+{
+	updateScreenBounds()
+	if (!MetalSonic.dead)
+	{
+		if Mods.isModActive("Bossbar") && (MetalSonic.state != 0 || MetalSonic.state == 0 && MetalSonic.state_timer >= 15)
+		{
+			u8 max_hits
+			if option.hitcount == 0
+				max_hits = 8
+			else if option.hitcount == 1
+				max_hits = 12
+			else if option.hitcount == 2
+				max_hits = 16
+			DrawBossHealthBar(0xf5, boss.remaining_hits, max_hits)
+		}
+		MetalSonic.StateMachine()
+		MetalSonic.HealthUpdater()
+	}
+	else
+	{
+		if (MetalSonic.dead_timer == 30)
+		{
+			objA0.velocity.y = -0x300
+		}
+		if (MetalSonic.dead_timer > 30)
+		{
+			MoveWithGravity20()
+		}
+		if (objA0.position.y.u16 > camera.position.y.u16 + 224 + 48)
+		{
+			objA0.update_address = 0x085668
+			objA0.position.y.u16 += 24
+			objA0.flags2a |= 0x80
+			u8[0xfffffab8] |= 0x01
+			objA0.countdown_callback = 0x07f210
+			MoveScreenBounds(level.bossarea.left, level.bossarea.right, level.bossarea.bottom)
+		}
+		++MetalSonic.dead_timer
+	}
+	if (objA0.position.y.u16 < camera.position.y.u16 + 224 + 48)
+	{
+		if (MetalSonic.state != 0 && MetalSonic.state != 5 && !MetalSonic.dead)
+		{
+			Enemy.DrawDynamicObject()
+		}
+		else
+		{
+			DrawObject()
+		}
+	}
+}
+
+function void MetalSonic.StateMachine()
+{
+	if (MetalSonic.state == 0)
+	{
+		objA0.position.y.u16 += 2
+		if (MetalSonic.state_timer == 45)
+		{
+			MetalSonic.state = 1
+			MetalSonic.state_timer = 0
+		}
+		++MetalSonic.state_timer
+	}
+	if (MetalSonic.state == 1)
+	{
+		if (MetalSonic.cycle == 0 || MetalSonic.cycle == 2)
+		{
+			if (MetalSonic.state_timer >= 40)
+			{
+				objA0.position.y.u16 -= 2
+			}
+			if (MetalSonic.state_timer == 175)
+			{
+				MetalSonic.sparking = false
+				objA0.state = 0
+				MetalSonic.prepare = 0
+				MetalSonic.state = 2
+				MetalSonic.state_timer = 0
+				objA0.position.x.u16 = 0x33d9
+				objA0.position.y.u16 = 0x032c
+				MetalSonic.cycle = 1
+			}
+		}
+		else if (MetalSonic.cycle == 1)
+		{
+			if (MetalSonic.state_timer >= 40)
+			{
+				objA0.position.y.u16 -= 2
+			}
+			if (MetalSonic.state_timer == 60)
+			{
+				MetalSonic.sparking = false
+				objA0.collision_attributes &= ~collision.flag.THREAT
+				objA0.state = 0
+				MetalSonic.prepare = 0
+				MetalSonic.state = 4
+				MetalSonic.state_timer = 0
+				MetalSonic.cycle = 2
+				setRealScreenBounds()
+			}
+		}
+		if (MetalSonic.state_timer >= 40)
+		{
+			MetalSonic.sparking = true
+			objA0.collision_attributes |= collision.flag.THREAT
+		}
+		++MetalSonic.state_timer
+	}
+	if(MetalSonic.state == 2)
+	{
+		s16 MetalSonic.velocityX = 10
+		u16 MetalSonic.jetframe = 110
+		u16 MetalSonic.endframe = 350
+		if (MetalSonic.phase2)
+		{
+			MetalSonic.velocityX = 15
+			MetalSonic.jetframe = 85
+			MetalSonic.endframe = 290
+		}
+		objA0.collision_attributes = collision.size.20x16 | collision.flag.THREAT
+		if (MetalSonic.state_timer == 1 || MetalSonic.state_timer == MetalSonic.jetframe)
+		{
+			Audio.playAudio("ms_charge", AudioContext.CONTEXT_SOUND)
+		}
+
+		if (MetalSonic.state_timer == 30 || MetalSonic.state_timer == MetalSonic.jetframe + 30)
+		{
+			Audio.playAudio("ms_dash", AudioContext.CONTEXT_SOUND)
+		}
+		if (MetalSonic.state_timer > 30 && MetalSonic.state_timer < MetalSonic.jetframe)
+		{
+			objA0.position.x.u16 += MetalSonic.velocityX
+			MetalSonic.flip = false
+		}
+		else if (MetalSonic.state_timer > MetalSonic.jetframe + 30)
+		{
+			objA0.position.x.u16 -= MetalSonic.velocityX
+			MetalSonic.flip = true
+		}
+		if (MetalSonic.state_timer == MetalSonic.endframe)
+		{
+			MetalSonic.state = 3
+			MetalSonic.state_timer = 0
+			objA0.position.x.u16 = 0x3500
+			objA0.position.y.u16 = 0x0279
+			MetalSonic.flip = false
+			objA0.collision_attributes = collision.size.12x20
+		}
+		++MetalSonic.state_timer
+	}
+	if (MetalSonic.state == 3)
+	{
+		objA0.position.y.u16 += 2
+		if (MetalSonic.state_timer == 45)
+		{
+			MetalSonic.state = 1
+			MetalSonic.state_timer = 0
+		}
+		++MetalSonic.state_timer
+	}
+	if (MetalSonic.state == 4)
+	{
+		++MetalSonic.state_timer
+		A1 = 0xffffb000
+		MetalSonic.flip = (objA0.position.x.u16 > objA1.position.x.u16)
+		if (MetalSonic.state_timer < 600)
+		{
+			objA0.position.y.u16 += cos_s16((level.framecounter % 360)*128)/512
+			if MetalSonic.state_timer % 60 == 0
+			{
+				MetalSonic.SpawnLaserBlast()
+			}
+			objA0.position.x.u16 = lerp(objA0.position.x.u16, objA1.position.x.u16, 24)
+		}
+		else if (MetalSonic.state_timer == 645)
+		{
+			MetalSonic.sparking = false
+			objA0.collision_attributes &= ~collision.flag.THREAT
+			objA0.state = 0
+			MetalSonic.state = 5
+			MetalSonic.state_timer = 0
+			MetalSonic.cycle = 0
+			setRealScreenBounds()
+			playSound(0x60)
+		}
+	}
+	if (MetalSonic.state == 5)
+	{
+		if (MetalSonic.state_timer < 120)
+		{
+			objA0.position.x.u16 = lerp(objA0.position.x.u16, 0x3500, 12)
+			objA0.position.y.u16 = lerp(objA0.position.y.u16, 0x02A1, 32)
+		}
+		else if (MetalSonic.state_timer < 960)
+		{
+			objA0.position.y.u16 += cos_s16((level.framecounter % 360)*128)/512
+			if (MetalSonic.state_timer % 90 == 0 || MetalSonic.state_timer % 90 == 30)
+			{
+				MetalSonic.SpikeAttack()
+			}
+		}
+		else if (MetalSonic.state_timer < 1020)
+		{
+			objA0.position.y.u16 -= 2
+		}
+		else if (MetalSonic.state_timer == 1020)
+		{
+			objA0.position.x.u16 = 0x3500
+			objA0.position.y.u16 = 0x0279
+			MetalSonic.state = 3
+			MetalSonic.state_timer = 0
+		}
+
+		if (MetalSonic.scale > 0x0008000)
+		{
+			MetalSonic.scale -= 0x0000500
+		}
+		++MetalSonic.state_timer
+	}
+	if (MetalSonic.state != 5)
+	{
+		MetalSonic.scale = 0x0010000
+	}
+}
+
+function void MetalSonic.HealthUpdater()
+{
+	if (objA0.collision_attributes != 0)
+		return
+	
+	if ((boss.remaining_hits <= 6))
+	{
+		MetalSonic.phase2 = true
+	}
+
+	if (boss.remaining_hits == 0)
+    {
+        // whatever code you wanna run for when the last hit is landed
+		spawnChildObject(0x083d84, 0x00, 0, 0)
+		/*
+		if (_equal())
+		{
+			u8[A1 + 0x2c] = 0x04
+		}
+		*/
+		MetalSonic.state_timer = 0
+        MetalSonic.dead = true
+        AddScoreForBossEnemy()
+		return
+    }
+
+	if (objA0.state == 0)
+	{
+		objA0.state = 0x20
+		playSound(0x6e)
+		++u8[A1 + 0x29]
+        objA0.flags2a |= 0x40
+	}
+	--objA0.state
+	if (objA0.state == 0)
+	{
+		objA0.flags2a &= ~0x40
+        u8[A0 + 0x28] = u8[A0 + 0x25]
+	}
+}
+
+//This function probably looks like a mess
+function bool Standalone.onWriteToSpriteTable(s16 px, s16 py, u16 renderQueue)
+{
+	if (objA0.update_address == 0x320000)
+	{	
+		u64 key
+		u8 flipFlag = !MetalSonic.flip ? 0 : SPRITE_FLAG_FLIP_X
+		u32 MetalSonic.renderQueue = 0x8fff
+
+		//BG attack? Use lower renderqueue
+		if (MetalSonic.state == 5)
+		{
+			MetalSonic.renderQueue = 0x3000
+		}
+		else
+		{
+			MetalSonic.renderQueue = 0x8fff
+		}
+
+		if (MetalSonic.state != 2 && MetalSonic.state != 5)
+		{
+			key = "metalsonic_idle"
+		}
+		else if (MetalSonic.state == 2)
+		{
+			key = stringformat("metalsonic_attack_0x0%d", 1 + (level.framecounter.low & 0x01))
+		}
+		else if (MetalSonic.state == 5)
+		{
+			key = "metalsonic_facingforward"
+		}
+		if (MetalSonic.prepare > 0)
+		{
+			key = stringformat("metalsonic_attack_0x0%d", MetalSonic.prepare - 1)
+		}
+		if (MetalSonic.sparking)
+		{
+			key = stringformat("metalsonic_spark_0x0%d", level.framecounter.low & 0x01)
+			if (level.framecounter.low & 0x01)
+			{
+				Renderer.drawCustomSprite("metalsonic_sparkeffect", px, py, 0x00, SPRITE_FLAG_PRIO | render_flag.WORLD, MetalSonic.renderQueue + 1)
+				playSound(0x5c)
+			}
+		}
+		if (MetalSonic.laserShotTimer)
+		{
+			MetalSonic.laserShotTimer--
+			key = stringformat("metalsonic_lasershot_0x0%d", MetalSonic.laserShotTimer < 4)
+		}
+
+		//Hit? Use hit flash sprites
+		if (objA0.state && (level.framecounter.low & 0x01))
+		{
+			if (key != "metalsonic_attack_0x00" && key != "metalsonic_attack_0x01" && key != "metalsonic_facingforward" && key != "metalsonic_spark_0x00" && key != "metalsonic_spark_0x01") // This check is quite big, but it ensures that the correct frames get the right sprite key.
+			{
+				key = stringformat("%s_hit", key)
+			}
+		}
+
+		//Dead? Use the dead sprite
+		if (MetalSonic.dead_timer > 30)
+		{
+			key = "metalsonic_dead"
+		}
+
+		if (MetalSonic.prepare < 2 && MetalSonic.state != 2 && !MetalSonic.dead)
+		{
+			s16 dx = (MetalSonic.flip ? 9:-9)
+			if (MetalSonic.state == 5)
+			{
+				dx = 0
+			}
+			Renderer.drawCustomSprite(stringformat("jet_0x0%d", (level.framecounter / 3) % 4), px + dx, py, 0x00, SPRITE_FLAG_PRIO | render_flag.WORLD | flipFlag, MetalSonic.renderQueue - 1, 0, 0xffffffff, MetalSonic.scale)
+		}
+
+		Renderer.drawCustomSprite(key, px, py, 0x00, SPRITE_FLAG_PRIO | render_flag.WORLD | flipFlag, MetalSonic.renderQueue, 0, 0xffffffff, MetalSonic.scale)
+		return true
+	}
+	if (objA0.update_address == 0x322000)
+	{
+		u32 px_fake
+		u32 py_fake
+
+		if (objA0.subtype2c == 0x02)
+		{
+			Renderer.drawCustomSprite(stringformat("laser_0x0%d", objA0.state / 2 % 4), px, py, 0x00, SPRITE_FLAG_PRIO | render_flag.WORLD, 0x4005, 0, 0xff, objA0.value32)
+		}
+		else
+		{
+			Renderer.drawCustomSprite(stringformat("laser_0x0%d", objA0.state / 2 % 4), px, py, 0x00, SPRITE_FLAG_PRIO | render_flag.WORLD, 0x4005)
+		}
+		return true
+	}
+	if (objA0.update_address == 0x323000)
+	{
+		Renderer.drawCustomSprite("metalsonic_spikeball", px, py, 0, SPRITE_FLAG_PRIO | render_flag.WORLD, renderQueue, objA0.value26, 0xff)
+		return true
+	}
+	if (objA0.update_address == 0x323100)
+	{
+		Renderer.drawCustomSprite(stringformat("boss_explosion_0x0%d", (objA0.animation.sprite / 2) % 6), px, py, 0, SPRITE_FLAG_PRIO | render_flag.WORLD, renderQueue)
+		return true
+	}
+	return base.Standalone.onWriteToSpriteTable(px, py, renderQueue)
+}
+
+//# address-hook(0x085ca4) end(0x085d68)
+function void CheckForBossStart()
+{
+	if (global.zone_act != 0x0b01)
+	{
+		base.CheckForBossStart()
+		return
+	}
+	// Condition 1: Countdown (can be zero from start)
+	if ((u8[A0 + 0x27] & 0x01) == 0)
+	{
+		--objA0.countdown_value
+		if (objA0.countdown_value < 0)
+		{
+			u8[A0 + 0x27] |= 0x01
+			level.default_music.u8 = objA0.value26
+			playMusic(MUSIC_CTRL_FADEOUT)
+		}
+	}
+
+	// Condition 2: Camera Y position
+	if ((u8[A0 + 0x27] & 0x02) == 0)
+	{
+		bool fulfilled = false
+		if (u8[A0 + 0x27] & 0x80)
+		{
+			fulfilled = (camera.position.y.u16 <= 0x1000)
+		}
+		else
+		{
+			fulfilled = (camera.position.y.u16 >= level.bossarea.top)
+			level.vertical_wrap = camera.position.y.u16		// To be overwritten if condition fulfilled
+		}
+
+		if (fulfilled)
+		{
+			u8[A0 + 0x27] |= 0x02
+			level.vertical_wrap = level.bossarea.top
+			move_area.bottom.target = level.bossarea.bottom
+		}
+	}
+
+	// Condition 3: Camera X position
+	if ((u8[A0 + 0x27] & 0x04) == 0)
+	{
+		bool fulfilled = false
+		if (u8[A0 + 0x27] & 0x40)
+		{
+			fulfilled = (camera.position.x.u16 > level.bossarea.right)
+			move_area.right = camera.position.x.u16
+		}
+		else
+		{
+			fulfilled = (camera.position.x.u16 >= level.bossarea.left)
+			move_area.left = camera.position.x.u16
+		}
+
+		if (fulfilled)
+		{
+			u8[A0 + 0x27] |= 0x04
+			move_area.left = level.bossarea.left
+			move_area.right = level.bossarea.right
+		}
+	}
+
+	// All conditions must be fulfilled to pass, and actually start the boss fight
+	if ((u8[A0 + 0x27] & 0x07) != 0x07)
+		return
+
+	u8[A0 + 0x27] = 0
+	u16[A0 + 0x1c] = 0
+	objA0.value26 = 0
+
+	A1 = objA0.countdown_callback
+	call A1
+}
+
+//# address-hook(0x083d84) end(0x083dac)
+function void fn083d84()
+{
+	if (global.zone_act != 0x0b01)
+	{
+		base.fn083d84()
+		return
+	}
+	
+	A1 = tableLookupAddress(0x083de6, objA0.subtype2c)
+	objA0.value39 = u8[A1]
+	objA0.value3a = u8[A1+1]
+	objA0.value3b = u8[A1+2]
+	u32 offset = u8[A1+3]
+
+	A1 = 0x083dae + offset
+	A2 = u32[A1]
+	objA0.update_address = A2
+	objA0.countdown_callback = u32[A1+4]
+	call A2
+	MoveWithParent()
+}
