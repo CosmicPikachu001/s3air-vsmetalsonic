@@ -626,7 +626,7 @@ function bool Standalone.onWriteToSpriteTable(s16 px, s16 py, u16 renderQueue)
 		if (MetalSonic.laserShotTimer)
 		{
 			MetalSonic.laserShotTimer--
-			key = stringformat("metalsonic_lasershot_0x0%d", MetalSonic.laserShotTimer < 4)
+			key = stringformat("metalsonic_lasershot_0x0%d", MetalSonic.laserShotTimer <= 3)
 		}
 
 		//Hit? Use hit flash sprites
