@@ -1,5 +1,7 @@
 {
-    "metalsonic_boss": {"File": "MetalSonic.ogg", "Name": "Vs Metal Sonic", "Type": "Music", "LoopStart": "263067"},
+	//Boss Theme, remixed by JustKam
+	"metalsonic_boss": {"File": "MetalSonic.ogg", "Name": "Vs Metal Sonic", "Type": "Music", "LoopStart": "263067"},
+	//Charge and Dash sounds, provided by Benkoopa
 	"ms_charge": {"File": "MSChargeFire.ogg", "Type": "Sound"},
 	"ms_dash": {"File": "MSFireball.ogg", "Type": "Sound"}
 }
