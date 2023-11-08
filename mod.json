@@ -1,0 +1,40 @@
+{
+	"Metadata":
+	{
+		"Name": "Vs. Metal Sonic",
+		"Author": "Cosmic",
+		"Description": "Adds Metal Sonic as a custom boss in DEZ2, replacing Death Ball.",
+		"URL": "",
+		"ModVersion": "1.0",
+		"GameVersion": "21.05.08.0"
+	},
+	"Settings":
+	{
+		"List":
+		[
+			{
+				"InternalName": "MetalBossTheme",
+				"DisplayName": "Metal Sonic Boss Theme",
+				"Variable": "option.metalBossTheme",
+				"DefaultValue": "0x01",
+				"Options":
+				{
+				   "0x00": "Menu Option",
+					"0x01": "Sonic 4 Episode 2 (16-Bit)"
+				}
+			},
+			{
+				"InternalName": "MetalSonicHits",
+				"DisplayName": "Metal Sonic Hits",
+				"Variable": "option.hitcount",
+				"DefaultValue": "0x01",
+				"Options":
+				{
+					"0x00": "8",
+					"0x01": "12 (Default)",
+					"0x02": "16"
+				}
+			}
+		]
+	}
+}
