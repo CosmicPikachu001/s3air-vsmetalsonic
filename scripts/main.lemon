@@ -19,7 +19,7 @@ global u8 MetalSonic.laserShotTimer
 
 /*
 MetalSonic.state
-0 - Intro
+0 - Intro - Boring and basic, but will be improved on in the full release of the level mod, currently named Cosmic's Levels.
 1 - Idle
 2 - Jet attack
 3 - Going down into idle (like 0, but it draws the bossbar)
@@ -481,7 +481,6 @@ function void MetalSonic.StateMachine()
 		MetalSonic.flip = (objA0.position.x.u16 > objA1.position.x.u16)
 		if (MetalSonic.state_timer < 600)
 		{
-			objA0.position.y.u16 += cos_s16((level.framecounter % 360)*128)/512
 			if MetalSonic.state_timer % 60 == 0
 			{
 				MetalSonic.SpawnLaserBlast()
