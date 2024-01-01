@@ -9,22 +9,42 @@ global bool MetalSonic.flip
 global bool MetalSonic.prepare
 global u8 MetalSonic.dead_timer
 global u8 MetalSonic.cycle
-global u32 MetalSonic.scale
+global float MetalSonic.scale
 global u32 realLock.left
 global u32 realLock.right
 global u32 realLock.y
 global bool MetalSonic.sparking
 global u8 MetalSonic.movementDir
 global u8 MetalSonic.laserShotTimer
+global float jetScale
+global u8 jetScaleDir
+global bool MetalSonic.jetFlicker
+global float circleScale
+global float circleOpacity
+global u8 circleTimer
+global s32 circle.x
+global s32 circle.y
+global u32 MetalSonic.renderQueue = 0x8fff
 
 /*
 MetalSonic.state
-0 - Intro - Boring and basic, but will be improved on in the full release of the level mod, currently named Cosmic's Levels.
+0 - Intro - Boring and basic, but will be improved on in the full release of the level mod, currently named Cosmic Revamp.
 1 - Idle
 2 - Jet attack
 3 - Going down into idle (like 0, but it draws the bossbar)
 4 - Laser shots above player
 5 - BG spike bomb attack
+*/
+
+/*
+Object List
+
+0x320000 - The boss, Metal Sonic
+0x320002 - Laser projectile spawn
+0x320004 - Laser projectile update
+0x320006 - Spike ball spawn
+0x320008 - Spike ball update
+0x32000A - Spike ball explosion
 */
 
 global u32 MetalSonic.screenboundLeft
@@ -204,20 +224,79 @@ function void MetalSonic.SpawnLaserBlast()
 	{
 		MetalSonic.laserShotTimer = 6
 		playSound(0x54)
-		objA1.update_address = 0x322100
+		objA1.update_address = 0x320002
 		objA1.position.x.u16 = objA0.position.x.u16
 		objA1.position.y.u16 = objA0.position.y.u16
 	}
 }
 
-//# address-hook(0x323000)
+//# address-hook(0x320002)
+function void MetalSonic.LaserBlast.Spawn()
+{
+	objA0.sprite_attributes = (sprite_attribute.PRIORITY | 0x06bc)
+	objA0.render_flags = render_flag.WORLD| render_flag.VISIBLE
+	objA0.sprite_priority = 0x100
+		
+	objA0.box_size.x = 16
+	objA0.box_size.y = 16
+
+	objA0.collision_attributes = collision.size.16x16
+	objA0.hitbox_extends.x = 16
+	objA0.hitbox_extends.y = 16
+	objA0.collision_attributes |= collision.flag.THREAT
+
+	objA0.velocity.y = 0x400
+	objA0.update_address = 0x320004
+}
+
+//# address-hook(0x320004)
+function void MetalSonic.LaserBlast.Update()
+{
+	if (objA0.collision_attributes & collision.flag.THREAT)
+	{
+		Enemy.DrawDynamicObject()
+	}
+	else
+	{
+		DrawObject()
+	}
+	UpdateMovementStraightSimple()
+	++objA0.state
+	if (!(objA0.render_flags & render_flag.VISIBLE))
+	{
+		UnloadObject()
+	}
+}
+
+function void MetalSonic.SpikeAttack()
+{
+	playSound(0x98)
+	if(allocDynamicObjectStd())
+	{
+		objA1.update_address = 0x320006
+		objA1.position.y.u16 = 0x0278
+	}
+}
+
+//# address-hook(0x320006)
+function void MetalSonic.SpikeBall.Spawn()
+{
+	A1 = 0xffffb000
+	objA0.position.x.u16 = objA1.position.x.u16
+
+	objA0.render_flags |= render_flag.WORLD
+	objA0.velocity.y = 6
+	objA0.update_address = 0x320008
+}
+
+//# address-hook(0x320008)
 function void MetalSonic.SpikeBall.Update()
 {
 	if (objA0.position.y.u16 >= 0x033c)
 	{
 		if (allocDynamicObjectStd())
 		{
-			spawnChildObject(0x323100, 0x00, 0, 0)
+			spawnChildObject(0x32000A, 0x00, 0, 0)
 			playSound(0xb4)
 			objA1.render_flags |= render_flag.WORLD
 		}
@@ -242,7 +321,7 @@ function void MetalSonic.SpikeBall.Update()
 	Enemy.DrawDynamicObject()
 }
 
-//# address-hook(0x323100)
+//# address-hook(0x32000A)
 function void MetalSonic.ProjectileExplosion.Update()
 {
 	DrawObject()
@@ -250,65 +329,6 @@ function void MetalSonic.ProjectileExplosion.Update()
 	objA0.state++
 	if objA0.state == 12
 		UnloadObject()
-}
-
-//# address-hook(0x323600)
-function void MetalSonic.SpikeBall.Spawn()
-{
-	A1 = 0xffffb000
-	objA0.position.x.u16 = objA1.position.x.u16
-
-	objA0.render_flags |= render_flag.WORLD
-	objA0.velocity.y = 6
-	objA0.update_address = 0x323000
-}
-
-function void MetalSonic.SpikeAttack()
-{
-	playSound(0x98)
-	if(allocDynamicObjectStd())
-	{
-		objA1.update_address = 0x323600
-		objA1.position.y.u16 = 0x0278
-	}
-}
-
-//# address-hook(0x322000)
-function void MetalSonic.LaserBlast.Update()
-{
-	if (objA0.collision_attributes & collision.flag.THREAT)
-	{
-		Enemy.DrawDynamicObject()
-	}
-	else
-	{
-		DrawObject()
-	}
-	UpdateMovementStraightSimple()
-	++objA0.state
-	if (!(objA0.render_flags & render_flag.VISIBLE))
-	{
-		UnloadObject()
-	}
-}
-
-//# address-hook(0x322100)
-function void MetalSonic.HomingLaserBlast.Spawn()
-{
-	objA0.sprite_attributes = (sprite_attribute.PRIORITY | 0x06bc)
-	objA0.render_flags = render_flag.WORLD| render_flag.VISIBLE
-	objA0.sprite_priority = 0x100
-		
-	objA0.box_size.x = 16
-	objA0.box_size.y = 16
-
-	objA0.collision_attributes = collision.size.16x16
-	objA0.hitbox_extends.x = 16
-	objA0.hitbox_extends.y = 16
-	objA0.collision_attributes |= collision.flag.THREAT
-
-	objA0.velocity.y = 0x400
-	objA0.update_address = 0x322000
 }
 
 //# address-hook(0x320000)
@@ -403,7 +423,7 @@ function void MetalSonic.StateMachine()
 			{
 				objA0.position.y.u16 -= 2
 			}
-			if (MetalSonic.state_timer == 60)
+			if (MetalSonic.state_timer == 45)
 			{
 				MetalSonic.sparking = false
 				objA0.collision_attributes &= ~collision.flag.THREAT
@@ -412,7 +432,6 @@ function void MetalSonic.StateMachine()
 				MetalSonic.state = 4
 				MetalSonic.state_timer = 0
 				MetalSonic.cycle = 2
-				setRealScreenBounds()
 			}
 		}
 		if (MetalSonic.state_timer >= 40)
@@ -495,7 +514,6 @@ function void MetalSonic.StateMachine()
 			MetalSonic.state = 5
 			MetalSonic.state_timer = 0
 			MetalSonic.cycle = 0
-			setRealScreenBounds()
 			playSound(0x60)
 		}
 	}
@@ -526,15 +544,24 @@ function void MetalSonic.StateMachine()
 			MetalSonic.state_timer = 0
 		}
 
-		if (MetalSonic.scale > 0x0008000)
+		if (MetalSonic.scale > 0.5f)
 		{
-			MetalSonic.scale -= 0x0000500
+			MetalSonic.scale -= 0.025f
 		}
 		++MetalSonic.state_timer
 	}
-	if (MetalSonic.state != 5)
+	if MetalSonic.state == 6
 	{
-		MetalSonic.scale = 0x0010000
+		if (MetalSonic.scale < 1.0f)
+		{
+			MetalSonic.scale += 0.05f
+		}
+		MetalSonic.jetFlicker = true
+		++MetalSonic.state_timer
+	}
+	if (MetalSonic.state != 5 && MetalSonic.state != 6)
+	{
+		MetalSonic.scale = 1.0f
 	}
 }
 
@@ -644,40 +671,54 @@ function bool Standalone.onWriteToSpriteTable(s16 px, s16 py, u16 renderQueue)
 			key = "metalsonic_dead"
 		}
 
-		if (MetalSonic.prepare < 2 && MetalSonic.state != 2 && !MetalSonic.dead)
+		float maxScale = (MetalSonic.scale < 0.5f) ? 0.45f : 0.9f
+		float minScale = (MetalSonic.scale < 0.5f) ? 0.25f : 0.5f
+
+		if (((MetalSonic.prepare < 2 && MetalSonic.state != 2) || global.zone_act == 0x0300) && !MetalSonic.dead)
 		{
 			s16 dx = (MetalSonic.flip ? 9:-9)
-			if (MetalSonic.state == 5)
+			if (key == "metalsonic_facingforward")
 			{
 				dx = 0
 			}
-			Renderer.drawCustomSprite(stringformat("jet_0x0%d", (level.framecounter / 3) % 4), px + dx, py, 0x00, SPRITE_FLAG_PRIO | render_flag.WORLD | flipFlag, MetalSonic.renderQueue - 1, 0, 0xffffffff, MetalSonic.scale)
+			if jetScale < minScale
+				jetScaleDir = 1
+			else if jetScale > maxScale
+				jetScaleDir = 0
+
+			if jetScaleDir == 0
+			{
+				jetScale -= (MetalSonic.jetFlicker) ? 0.025f : 0.075f
+			}
+			else if jetScaleDir == 1
+			{
+				jetScale += (MetalSonic.jetFlicker) ? 0.025f : 0.075f
+			}
+			SpriteHandle jetSpr = Renderer.addSpriteHandle("jet_0x03", px + dx, py, MetalSonic.renderQueue - 1)
+			jetSpr.setBlendMode(3)
+			jetSpr.setScale(MetalSonic.scale - jetScale)
 		}
 
-		Renderer.drawCustomSprite(key, px, py, 0x00, SPRITE_FLAG_PRIO | render_flag.WORLD | flipFlag, MetalSonic.renderQueue, 0, 0xffffffff, MetalSonic.scale)
+		SpriteHandle metalSpr = Renderer.addSpriteHandle(key, px, py, MetalSonic.renderQueue)
+		metalSpr.setFlags(0x40)
+		metalSpr.setScale(MetalSonic.scale)
+		metalSpr.setFlipX(MetalSonic.flip)
 		return true
 	}
-	if (objA0.update_address == 0x322000)
+	if (objA0.update_address == 0x320004)
 	{
-		u32 px_fake
-		u32 py_fake
-
-		if (objA0.subtype2c == 0x02)
-		{
-			Renderer.drawCustomSprite(stringformat("laser_0x0%d", objA0.state / 2 % 4), px, py, 0x00, SPRITE_FLAG_PRIO | render_flag.WORLD, 0x4005, 0, 0xff, objA0.value32)
-		}
-		else
-		{
-			Renderer.drawCustomSprite(stringformat("laser_0x0%d", objA0.state / 2 % 4), px, py, 0x00, SPRITE_FLAG_PRIO | render_flag.WORLD, 0x4005)
-		}
-		return true
+		SpriteHandle laserSprite = Renderer.addSpriteHandle("laser_0x03", objA0.position.x.u16, objA0.position.y.u16, 0x4005)
+		laserSprite.setScale(Math.sin(objA0.state / 3))
+		laserSprite.setOpacity(0.5f)
+		laserSprite.setFlags(0x20)
+		laserSprite.setBlendMode(3)
 	}
-	if (objA0.update_address == 0x323000)
+	if (objA0.update_address == 0x320008)
 	{
 		Renderer.drawCustomSprite("metalsonic_spikeball", px, py, 0, SPRITE_FLAG_PRIO | render_flag.WORLD, renderQueue, objA0.value26, 0xff)
 		return true
 	}
-	if (objA0.update_address == 0x323100)
+	if (objA0.update_address == 0x32000A)
 	{
 		Renderer.drawCustomSprite(stringformat("boss_explosion_0x0%d", (objA0.animation.sprite / 2) % 6), px, py, 0, SPRITE_FLAG_PRIO | render_flag.WORLD, renderQueue)
 		return true
@@ -688,7 +729,7 @@ function bool Standalone.onWriteToSpriteTable(s16 px, s16 py, u16 renderQueue)
 //# address-hook(0x085ca4) end(0x085d68)
 function void CheckForBossStart()
 {
-	if (global.zone_act != 0x0b01)
+	if global.zone_act != 0x0b01
 	{
 		base.CheckForBossStart()
 		return
@@ -701,7 +742,7 @@ function void CheckForBossStart()
 		{
 			u8[A0 + 0x27] |= 0x01
 			level.default_music.u8 = objA0.value26
-			playMusic(MUSIC_CTRL_FADEOUT)
+			playMusic(objA0.value26)
 		}
 	}
 
@@ -711,7 +752,7 @@ function void CheckForBossStart()
 		bool fulfilled = false
 		if (u8[A0 + 0x27] & 0x80)
 		{
-			fulfilled = (camera.position.y.u16 <= 0x1000)
+			fulfilled = (camera.position.y.u16 <= level.bossarea.bottom + 0x60)
 		}
 		else
 		{
