@@ -115,64 +115,9 @@ function void fn07f0d2()
 	base.fn07f0d2()
 }
 
-//# address-hook(0x07f06c) end(0x07f0ba)
-function void fn07f06c()
-{
-	A1 = 0x07f0be
-	if (InitBoss(0x07f076))
-		return
-
-	objA0.update_address = 0x07f0ce
-	objA0.countdown_callback = 0x07f0d2
-
-	A1 = 0x07f0c6
-	objA0.value26 = MUSIC_MAINBOSS
-	StartBossFight()
-	u8[0xfffffab8] = 0
-
-	requestLoadingPatterns(0x76)		// Robotnik running and standing sprites
-	Kosinski.addToDMAQueue(0x181002, 0x7140)		// Boss sprites
-	loadPaletteLine1(0x07fd08)
-
-	// "spawnChildObjects(0x07fc8c)" replaced by:
-	//spawnChildObject(0x07f71c, 0x00, 0, 0)
-	spawnChildObject(0x07f782, 0x02, 0, 0)
-}
-
-// Robotnik standing there and watching
-
-//# address-hook(0x07f71c) end(0x07f746)
-function void fn07f71c()
-{
-	setupObjectAttributesFull(0x07fc74)
-
-	objA0.update_address = 0x070068
-	objA0.countdown_callback = 0x07f74c
-	u32[A0 + 0x30] = 0x07fce2
-	objA0.position.x.u16 = 0x3610
-	objA0.position.y.u16 = 0x0324
-}
-
-//# address-hook(0x07f79c) end(0x07f7c8)
-function void fn07f79c()
-{
-	A1 = 0xffff0000 + u16[A0 + 0x46]
-	if (u8[A1 + 0x38] & 0x10)
-	{
-		objA0.animation.sprite = 0x15
-
-		// "spawnSimpleChildObjects(0x083fee)" replaced by:
-		spawnSimpleChildObjects(0x083d84, 1)		// Boss explosion generator
-		if (_equal())
-		{
-			u8[A1 + 0x2c] = 0x06
-		}
-	}
-}
-
 function u64 Standalone.getModdedSoundKey(u64 soundKey, u8 sfxId, u8 soundRegType)
 {
-	if (sfxId == MUSIC_MAINBOSS && global.zone_act == 0x0b01)
+	if (sfxId == MUSIC_MAINBOSS && global.zone_act == 0x0b01 && option.MetalBossTheme)
 	{
 		return "metalsonic_boss"
 	}
@@ -274,7 +219,7 @@ function void MetalSonic.SpikeAttack()
 	if(allocDynamicObjectStd())
 	{
 		objA1.update_address = 0x320006
-		objA1.position.y.u16 = 0x0278
+		objA1.position.y.u16 = 0x0248
 	}
 }
 
