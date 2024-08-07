@@ -15,11 +15,11 @@
 			{
 				"InternalName": "MetalBossTheme",
 				"DisplayName": "Metal Sonic Boss Theme",
-				"Variable": "option.metalBossTheme",
+				"Variable": "option.MetalBossTheme",
 				"DefaultValue": "0x01",
 				"Options":
 				{
-				   "0x00": "Menu Option",
+					"0x00": "Menu Option",
 					"0x01": "Sonic 4 Episode 2 (16-Bit)"
 				}
 			},
