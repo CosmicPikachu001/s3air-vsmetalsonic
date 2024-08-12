@@ -15,7 +15,7 @@
 			{
 				"InternalName": "MetalBossTheme",
 				"DisplayName": "Metal Sonic Boss Theme",
-				"Variable": "option.metalBossTheme",
+				"Variable": "option.MetalBossTheme",
 				"DefaultValue": "0x01",
 				"Options":
 				{
