@@ -30,16 +30,16 @@
 	"laser_0x03":  { "File": "boss.png", "Rect": "113,53,32,32", "Center": "16,16" },
 	//Bossbar name
 	"bossf5":  { "File": "bossname.png", "Rect": "0,0,0,0", "Center": "0,0" },
-	//Unused hitmarkers
-	"hitmarker_0":  { "File": "markers.png", "Rect": "0,0,20,20", "Center": "10,10" },
-	"hitmarker_1":  { "File": "markers.png", "Rect": "20,0,20,20", "Center": "10,10" },
+	//hitmarkers
+	"hitmarker_0x00":  { "File": "markers.png", "Rect": "0,0,20,20", "Center": "10,10" },
+	"hitmarker_0x01":  { "File": "markers.png", "Rect": "20,0,20,20", "Center": "10,10" },
 	//Spikeball
 	"metalsonic_spikeball":  { "File": "spikebomb.png", "Rect": "0,0,15,15", "Center": "7,7" },
 	//Explosions for the spikeballs, bmp from UML Demo 3
-	"boss_explosion_0x00":  { "File": "explosion.bmp", "Rect": "0,1,16,16", "Center": "8,8" },
-	"boss_explosion_0x01":  { "File": "explosion.bmp", "Rect": "17,1,24,24", "Center": "12,12" },
-	"boss_explosion_0x02":  { "File": "explosion.bmp", "Rect": "42,1,24,24", "Center": "12,12" },
-	"boss_explosion_0x03":  { "File": "explosion.bmp", "Rect": "67,1,24,24", "Center": "12,12" },
-	"boss_explosion_0x04":  { "File": "explosion.bmp", "Rect": "92,1,24,24", "Center": "12,13" },
-	"boss_explosion_0x05":  { "File": "explosion.bmp", "Rect": "117,0,24,16", "Center": "12,10" }
+	"boss_explosion_0x00":  { "File": "explosion.png", "Rect": "0,1,16,16", "Center": "8,8" },
+	"boss_explosion_0x01":  { "File": "explosion.png", "Rect": "17,1,24,24", "Center": "12,12" },
+	"boss_explosion_0x02":  { "File": "explosion.png", "Rect": "42,1,24,24", "Center": "12,12" },
+	"boss_explosion_0x03":  { "File": "explosion.png", "Rect": "67,1,24,24", "Center": "12,12" },
+	"boss_explosion_0x04":  { "File": "explosion.png", "Rect": "92,1,24,24", "Center": "12,13" },
+	"boss_explosion_0x05":  { "File": "explosion.png", "Rect": "117,0,24,16", "Center": "12,10" }
 }

@@ -1,0 +1,37 @@
+//More will be added to this in future
+
+//# address-hook(0x32000a)
+function void Credits.MetalSonic()
+{
+    if (allocDynamicObjectStd() && objA0.value32 % 20 == 0)
+    {
+        spawnChildObject(0x32000C, 0x00, System.randRange(-16, 16), System.randRange(-16, 16))
+    }
+    objA0.velocity.y = cos_s16((objA0.value32 % (0x648))*24)/8
+    DrawObject()
+    UpdateMovementStraightSimple()
+    ++objA0.value32
+}
+
+//# address-hook(0x32000c)
+function void Credits.Explosion()
+{
+    DrawObject()
+    objA0.animation.sprite++
+	objA0.state++
+    if objA0.state == 12
+        UnloadObject()
+}
+
+//# address-hook(0x05f0e2) end(0x05f104)
+function void fn05f0e2()
+{
+	base.fn05f0e2()
+    if (allocDynamicObjectStd())
+    {
+        //Spawn Metal Sonic
+        objA1.update_address = 0x32000a
+        objA1.position.x.u16 = 140
+        objA1.position.y.u16 = 90
+    }
+}

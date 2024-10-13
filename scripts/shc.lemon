@@ -1,0 +1,176 @@
+global s16 shc_metalAnimCounter
+global u16 shc_metalOpacity
+
+function bool SHCSplash.shouldShowUpAfterStartup()
+{
+    return true
+}
+
+function void SHCSplash.showSplashScreen()
+{
+	s16 opacity = 0
+    shc_metalOpacity = opacity
+	u16 controllerPressed = 0
+
+	// Wait briefly in a black screen
+	SHCSplash.setPalette(0)
+	for (u8 frame = 0; frame < 30; ++frame)
+	{
+		Renderer.resetSprites()
+		yieldExecution()
+	}
+
+	// Fade in
+    shc_metalOpacity += 7
+	for (; opacity <= 0x100; opacity += 8)
+	{
+        if (shc_metalOpacity < 0xff - 8)
+        {
+            shc_metalOpacity += 8
+        }
+        MetalSonic.SHCRender()
+		SHCSplash.setPalette(opacity)
+		Renderer.resetSprites()
+		Renderer.drawCustomSprite("shc_splash_frame_02", getScreenWidth() / 2, getScreenHeight() / 2, 0, 0, 0xa000)
+
+		yieldExecution()
+	}
+
+	constant array<u8> ANIMATION_DATA =		// Animation data from Mania version of the splash screen
+	{
+		// Sprite number, duration
+		2, 8,		// Original duration: 64 - but shortened here to accommodate for the fade-in
+		1, 1,
+		0, 1,
+		1, 1,
+		2, 1,
+		1, 1,
+		0, 2,
+		2, 1,
+		0, 2,
+		1, 1,
+		2, 3,
+		0, 1,
+		2, 4,
+		1, 1,
+		0, 3,
+		1, 2,
+		0, 3,
+		1, 2,
+		2, 4,
+		1, 2,
+		0, 3,
+		2, 4,
+		0, 64,
+		2, 4,
+		1, 2,
+		0, 3,
+		2, 2,
+		0, 3,
+		1, 2,
+		2, 2,
+		0, 3,
+		2, 2,
+		0, 3,
+		2, 2,
+		1, 2,
+		0, 3,
+		1, 2,
+		0, 64,
+		2, 2,
+		0, 3,
+		1, 2,
+		2, 2,
+		0, 3,
+		2, 2,
+		1, 2,
+		0, 3,
+		1, 2,
+		2, 2,
+		1, 2,
+		2, 2,
+		1, 2,
+		0, 3,
+		2, 2,
+		0, 3,
+		1, 2,
+		2, 8		// Original duration: 360 - but shortened here, as that was certainly only meant to effectively stop the animation here
+	}
+
+	Audio.playAudio("shc_splash")
+
+	// Show the animation
+	u8 animationStep = 0
+	u8 animationCounter = 0
+	while (animationStep * 2 < ANIMATION_DATA.length())
+	{
+        MetalSonic.SHCRender()
+		controllerPressed |= Input.getController(0)
+		if (controllerPressed != 0)
+			break
+
+		u8 currentStepSprite = ANIMATION_DATA[animationStep * 2]
+		u8 currentStepDuration = ANIMATION_DATA[animationStep * 2 + 1]
+		Renderer.resetSprites()
+		Renderer.drawCustomSprite(stringformat("shc_splash_frame_%02d", currentStepSprite), getScreenWidth() / 2, getScreenHeight() / 2, 0, 0, 0xa000)
+
+		++animationCounter
+		if (animationCounter >= currentStepDuration)
+		{
+			++animationStep
+			animationCounter = 0
+		}
+
+		yieldExecution()
+	}
+
+	shc_metalOpacity -= 7
+	// Fade out
+	for (; opacity >= 0; opacity -= (controllerPressed != 0) ? 0x10 : 8)
+	{
+        if (shc_metalOpacity > 0)
+        {
+            shc_metalOpacity -= (controllerPressed != 0) ? 15 : 7
+        }
+        MetalSonic.SHCRender()
+		controllerPressed |= Input.getController(0)
+
+		SHCSplash.setPalette(opacity)
+		Renderer.resetSprites()
+		Renderer.drawCustomSprite("shc_splash_frame_02", getScreenWidth() / 2, getScreenHeight() / 2, 0, 0, 0xa000)
+
+		yieldExecution()
+	}
+}
+
+function void MetalSonic.SHCRender()
+{
+    float maxScale = 0.9f
+	float minScale = 0.5f
+
+    u16 shcMetalSonic_posX = 190
+    u16 shcMetalSonic_posY = 170 + cos_s16((shc_metalAnimCounter % (0x648))*24)/48
+
+    Renderer.drawCustomSprite("metalsonic_facingforward", shcMetalSonic_posX, shcMetalSonic_posY, 0, 0, 0xa002, 0, shc_metalOpacity)
+
+    if jetScale < minScale
+        jetScaleDir = 1
+    else if jetScale > maxScale
+        jetScaleDir = 0
+
+    if jetScaleDir == 0
+    {
+        jetScale -= 0.075f
+    }
+    else if jetScaleDir == 1
+    {
+        jetScale += 0.075f
+    }
+    Renderer.drawSpriteTinted("jet_0x03", shcMetalSonic_posX, shcMetalSonic_posY, 0, 0, 0xa001, 0, -shc_metalOpacity, jetScale)
+    SpriteHandle jetSpr = Renderer.addSpriteHandle("jet_0x03", shcMetalSonic_posX, shcMetalSonic_posY, 0xa001)
+    jetSpr.setBlendMode(3)
+    jetSpr.setScale(jetScale)
+    ++shc_metalAnimCounter
+
+    jetSpr.setOpacity(shc_metalOpacity)
+}
