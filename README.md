@@ -6,7 +6,9 @@ There are changes to the arena, such as the removal of gravity flipping teleport
 
 Credits:
 
--Metal Sonic Boss Theme 16-Bit Remix made by JustKam
+-New Boss Theme arranged by Cosmic
+
+-Old Boss Theme 16-Bit Remix made by JustKam
 
 -Metal Sonic Sprites made by TannerTH25 and TheIrishSpriter
 
