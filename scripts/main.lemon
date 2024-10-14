@@ -4,7 +4,7 @@ include credits
 #if GAMEAPP < 0x24070100
 function s32 System.randRange(s32 min, s32 max)
 {
-	return (System.rand() % max) + min
+	return (System.rand() + min) % max
 }
 #endif
 
