@@ -1,6 +1,13 @@
 //include shc
 include credits
 
+#if GAMEAPP < 0x24070100
+function s32 System.randRange(s32 min, s32 max)
+{
+	return (System.rand() + min) % max
+}
+#endif
+
 global float MetalSonic.scale
 global float jetScale
 global u8 jetScaleDir
